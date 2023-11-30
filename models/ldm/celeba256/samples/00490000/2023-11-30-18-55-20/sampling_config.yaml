@@ -1,0 +1,9 @@
+base:
+- models/ldm/celeba256/config.yaml
+batch_size: 2
+custom_steps: 50
+eta: 0.0
+logdir: none
+n_samples: 2
+resume: models/ldm/celeba256/model.ckpt
+vanilla_sample: false
