@@ -32,6 +32,14 @@ def load_model_from_config(config, ckpt, verbose=False):
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
+    
+    parser.add_argument(
+        "-r",
+        "--resume",
+        type=str,
+        nargs="?",
+        help="load from logdir or checkpoint in logdir",
+    )
 
     parser.add_argument(
         "--prompt",
@@ -41,13 +49,6 @@ if __name__ == "__main__":
         help="the prompt to render"
     )
 
-    parser.add_argument(
-        "--outdir",
-        type=str,
-        nargs="?",
-        help="dir to write results to",
-        default="outputs/txt2img-samples"
-    )
     parser.add_argument(
         "--ddim_steps",
         type=int,
@@ -103,9 +104,11 @@ if __name__ == "__main__":
     )
     opt = parser.parse_args()
 
+    resume_split = opt.resume.split("/")
+    folder = "/".join(resume_split[:-1])
 
-    config = OmegaConf.load("configs/latent-diffusion/txt2img-1p4B-eval.yaml")  # TODO: Optionally download from same location as ckpt and chnage this logic
-    model = load_model_from_config(config, "models/ldm/text2img-large/model.ckpt")  # TODO: check path
+    config = OmegaConf.load(os.path.join(folder, 'config.yaml'))
+    model = load_model_from_config(config, opt.resume) 
 
     device = torch.device("cuda") if torch.cuda.is_available() else torch.device("cpu")
     model = model.to(device)
@@ -114,6 +117,8 @@ if __name__ == "__main__":
         sampler = PLMSSampler(model)
     else:
         sampler = DDIMSampler(model)
+
+    opt.outdir = os.path.join(folder, "samples")
 
     os.makedirs(opt.outdir, exist_ok=True)
     outpath = opt.outdir
@@ -133,7 +138,7 @@ if __name__ == "__main__":
                 uc = model.get_learned_conditioning(opt.n_samples * [""])
             for n in trange(opt.n_iter, desc="Sampling"):
                 c = model.get_learned_conditioning(opt.n_samples * [prompt])
-                shape = [4, opt.H//8, opt.W//8]
+                shape = [config.model.params.channels, config.model.params.image_size, config.model.params.image_size]
                 samples_ddim, _ = sampler.sample(S=opt.ddim_steps,
                                                  conditioning=c,
                                                  batch_size=opt.n_samples,
