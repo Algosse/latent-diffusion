@@ -1,0 +1,68 @@
+model:
+  base_learning_rate: 2.0e-06
+  target: ldm.models.diffusion.ddpm.LatentDiffusion
+  params:
+    linear_start: 0.0015
+    linear_end: 0.0195
+    num_timesteps_cond: 1
+    log_every_t: 200
+    timesteps: 1000
+    first_stage_key: data
+    cond_stage_key: label
+    image_size: 64
+    channels: 3
+    cond_stage_trainable: false
+    concat_mode: false
+    monitor: val/loss
+    unet_config:
+      target: ldm.modules.diffusionmodules.openaimodel.UNetModel
+      params:
+        image_size: 64
+        in_channels: 3
+        out_channels: 3
+        model_channels: 64
+        attention_resolutions:
+        - 8
+        - 4
+        - 2
+        num_res_blocks: 2
+        channel_mult:
+        - 1
+        - 2
+        - 3
+        - 4
+        num_head_channels: 16
+    first_stage_config:
+      target: ldm.models.autoencoder.IdentityFirstStage
+      params:
+        vq_interface: true
+    cond_stage_config: __is_unconditional__
+data:
+  target: main.DataModuleFromConfig
+  params:
+    batch_size: 16
+    num_workers: 4
+    wrap: false
+    train:
+      target: ldm.data.siar.SIAR
+      params:
+        root: /home/alban/ImSeqCond/data/SIARmini
+        set_type: train
+    validation:
+      target: ldm.data.siar.SIAR
+      params:
+        root: /home/alban/ImSeqCond/data/SIARmini
+        set_type: val
+
+lightning:
+  callbacks:
+    image_logger:
+      target: main.ImageLogger
+      params:
+        max_images: 8
+        batch_frequency: 250
+        log_on_batch_idx: False
+        increase_log_steps: False
+        log_images_kwargs:
+          inpaint: False
+          plot_progressive_rows: False
