@@ -2,3 +2,5 @@
 *.ckpt
 *.egg-info
 *.pyc
+
+logs/

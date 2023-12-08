@@ -1,5 +1,5 @@
 model:
-  base_learning_rate: 2.0e-06
+  base_learning_rate: 2.0e-05
   target: ldm.models.diffusion.ddpm.LatentDiffusion
   params:
     linear_start: 0.0015
@@ -20,7 +20,7 @@ model:
         image_size: 64
         in_channels: 3
         out_channels: 3
-        model_channels: 64
+        model_channels: 224
         attention_resolutions:
         - 8
         - 4
@@ -31,7 +31,7 @@ model:
         - 2
         - 3
         - 4
-        num_head_channels: 16
+        num_head_channels: 32
     first_stage_config:
       target: ldm.models.autoencoder.IdentityFirstStage
       params:
@@ -40,18 +40,18 @@ model:
 data:
   target: main.DataModuleFromConfig
   params:
-    batch_size: 16
+    batch_size: 8
     num_workers: 4
     wrap: false
     train:
       target: ldm.data.siar.SIAR
       params:
-        root: /home/alban/ImSeqCond/data/SIARmini
+        root: /home/alban/ImSeqCond/data/SIAR
         set_type: train
     validation:
       target: ldm.data.siar.SIAR
       params:
-        root: /home/alban/ImSeqCond/data/SIARmini
+        root: /home/alban/ImSeqCond/data/SIAR
         set_type: val
 
 lightning:
@@ -59,10 +59,13 @@ lightning:
     image_logger:
       target: main.ImageLogger
       params:
-        max_images: 8
-        batch_frequency: 250
+        max_images: 4
+        batch_frequency: 750
         log_on_batch_idx: False
         increase_log_steps: False
         log_images_kwargs:
           inpaint: False
           plot_progressive_rows: False
+ 
+trainer:
+  accumulate_grad_batches: 4
