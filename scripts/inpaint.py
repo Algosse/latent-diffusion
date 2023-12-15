@@ -69,7 +69,9 @@ if __name__ == "__main__":
     with torch.no_grad():
         with model.ema_scope():
             for image, mask in tqdm(zip(images, masks)):
-                outpath = os.path.join(opt.outdir, os.path.split(image)[1])
+                
+                file_name = os.path.split(image)[1].split(".")[0]
+
                 batch = make_batch(image, mask, device=device)
 
                 # encode masked image and concat downsampled mask
@@ -94,5 +96,14 @@ if __name__ == "__main__":
                                               min=0.0, max=1.0)
 
                 inpainted = (1-mask)*image+mask*predicted_image
+                
+                image = image.cpu().numpy().transpose(0,2,3,1)[0]*255
+                mask = mask.cpu().numpy().transpose(0,2,3,1)[0]*255
+                predicted_image = predicted_image.cpu().numpy().transpose(0,2,3,1)[0]*255
                 inpainted = inpainted.cpu().numpy().transpose(0,2,3,1)[0]*255
-                Image.fromarray(inpainted.astype(np.uint8)).save(outpath)
+
+                Image.fromarray(image.astype(np.uint8)).save(os.path.join(opt.outdir, f"{file_name}_image.png"))
+                #Image.fromarray(mask.astype(np.uint8)).save(os.path.join(opt.outdir, f"{file_name}_mask.png"))
+                Image.fromarray(inpainted.astype(np.uint8)).save(os.path.join(opt.outdir, f"{file_name}_inpainted.png"))
+                Image.fromarray(predicted_image.astype(np.uint8)).save(os.path.join(opt.outdir, f"{file_name}_predicted.png"))
+                
