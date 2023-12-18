@@ -20,17 +20,15 @@ model:
         image_size: 64
         in_channels: 3
         out_channels: 3
-        model_channels: 224
+        model_channels: 96
         attention_resolutions:
-        - 8
         - 4
         - 2
-        num_res_blocks: 2
+        - 1
+        num_res_blocks: 1
         channel_mult:
         - 1
         - 2
-        - 3
-        - 4
         num_head_channels: 32
     first_stage_config:
       target: ldm.models.autoencoder.IdentityFirstStage
@@ -40,19 +38,23 @@ model:
 data:
   target: main.DataModuleFromConfig
   params:
-    batch_size: 8
-    num_workers: 4
+    batch_size: 1
+    num_workers: 8
     wrap: false
     train:
       target: ldm.data.siar.SIAR
       params:
-        root: /home/alban/ImSeqCond/data/SIAR
+        root: ../data/SIAR
         set_type: train
+        resolution: 64
+        max_sequence_size: 1
     validation:
       target: ldm.data.siar.SIAR
       params:
-        root: /home/alban/ImSeqCond/data/SIAR
+        root: ../data/SIAR
         set_type: val
+        resolution: 64
+        max_sequence_size: 1
 
 lightning:
   callbacks:

@@ -21,17 +21,16 @@ model:
         image_size: 64
         in_channels: 3
         out_channels: 3
-        model_channels: 192
+        model_channels: 96
         attention_resolutions:
-        - 8
-        - 4
         - 2
-        num_res_blocks: 2
+        - 2
+        - 2
+        num_res_blocks: 1
         channel_mult:
         - 1
-        - 2
-        - 3
-        - 5
+        - 1
+        - 1
         num_heads: 8
     
     first_stage_config:
@@ -51,7 +50,7 @@ model:
           - 1
           - 2
           - 4
-          num_res_blocks: 2
+          num_res_blocks: 1
           attn_resolutions: []
           dropout: 0.0
         lossconfig:
@@ -65,8 +64,8 @@ model:
 data:
   target: main.DataModuleFromConfig
   params:
-    batch_size: 8
-    num_workers: 4
+    batch_size: 1
+    num_workers: 10
     wrap: false
     train:
       target: ldm.data.siar.SIAR
@@ -74,12 +73,14 @@ data:
         root: ../data/SIAR
         set_type: train
         resolution: 256
+        max_sequence_size: 1
     validation:
       target: ldm.data.siar.SIAR
       params:
         root: ../data/SIAR
         set_type: val
         resolution: 256
+        max_sequence_size: 1
 
 lightning:
   callbacks:
@@ -87,11 +88,11 @@ lightning:
       target: main.ImageLogger
       params:
         max_images: 4
-        batch_frequency: 750
+        batch_frequency: 500
         log_on_batch_idx: False
         increase_log_steps: False
         log_images_kwargs:
           inpaint: False
           plot_progressive_rows: False
   trainer:
-    accumulate_grad_batches: 4
+    accumulate_grad_batches: 8
