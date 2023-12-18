@@ -4,10 +4,14 @@
 *.pyc
 
 logs/
-models/
 
 
 data/ILSVRC2012_img_val.tar
 data/ILSVRC2012_img_train.tar
 
+Ignore data and models files
 *.pth
+*.cpkt
+*.pkl
+*.zip
+models/ldm/inpainting_big/archive
