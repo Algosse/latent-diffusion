@@ -1,13 +1,11 @@
+""" Copied form : https://github.com/SwinTransformer/Video-Swin-Transformer/blob/db018fb8896251711791386bbd2127562fd8d6a6/mmaction/models/backbones/swin_transformer.py#L172 """
+
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
 import torch.utils.checkpoint as checkpoint
 import numpy as np
 from timm.models.layers import DropPath, trunc_normal_
-
-from mmcv.runner import load_checkpoint
-from mmaction.utils import get_root_logger
-from ..builder import BACKBONES
 
 from functools import reduce, lru_cache
 from operator import mul
@@ -455,7 +453,6 @@ class PatchEmbed3D(nn.Module):
 
         return x
 
-@BACKBONES.register_module()
 class SwinTransformer3D(nn.Module):
     """ Swin Transformer backbone.
         A PyTorch impl of : `Swin Transformer: Hierarchical Vision Transformer using Shifted Windows`  -
@@ -613,40 +610,6 @@ class SwinTransformer3D(nn.Module):
         del checkpoint
         torch.cuda.empty_cache()
 
-    def init_weights(self, pretrained=None):
-        """Initialize the weights in backbone.
-
-        Args:
-            pretrained (str, optional): Path to pre-trained weights.
-                Defaults to None.
-        """
-        def _init_weights(m):
-            if isinstance(m, nn.Linear):
-                trunc_normal_(m.weight, std=.02)
-                if isinstance(m, nn.Linear) and m.bias is not None:
-                    nn.init.constant_(m.bias, 0)
-            elif isinstance(m, nn.LayerNorm):
-                nn.init.constant_(m.bias, 0)
-                nn.init.constant_(m.weight, 1.0)
-
-        if pretrained:
-            self.pretrained = pretrained
-        if isinstance(self.pretrained, str):
-            self.apply(_init_weights)
-            logger = get_root_logger()
-            logger.info(f'load model from: {self.pretrained}')
-
-            if self.pretrained2d:
-                # Inflate 2D model into 3D model.
-                self.inflate_weights(logger)
-            else:
-                # Directly load 3D model.
-                load_checkpoint(self, self.pretrained, strict=False, logger=logger)
-        elif self.pretrained is None:
-            self.apply(_init_weights)
-        else:
-            raise TypeError('pretrained must be a str or None')
-
     def forward(self, x):
         """Forward function."""
         x = self.patch_embed(x)
@@ -666,3 +629,33 @@ class SwinTransformer3D(nn.Module):
         """Convert the model into training mode while keep layers freezed."""
         super(SwinTransformer3D, self).train(mode)
         self._freeze_stages()
+
+if __name__ == '__main__':
+
+    transformer = SwinTransformer3D(
+        patch_size=(2,4,4),
+        in_chans=3,
+        embed_dim=96,
+        depths=[12],
+        num_heads=[6],
+        window_size=(2,7,7),
+        mlp_ratio=4.,
+        qkv_bias=True,
+        qk_scale=None,
+        drop_rate=0.,
+        attn_drop_rate=0.,
+        drop_path_rate=0.2,
+        norm_layer=nn.LayerNorm,
+        patch_norm=False,
+        frozen_stages=-1,
+        use_checkpoint=False)
+    
+    x = torch.randn(1, 3, 32, 64, 64)
+
+    out = transformer(x)
+
+    print(out.shape)
+
+    # print transformer parameters
+
+    print("Total Parameters:", sum([p.numel() for p in transformer.parameters()]))
