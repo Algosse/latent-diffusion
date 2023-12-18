@@ -25,6 +25,7 @@ dependencies:
     - transformers==4.15.0
     - kornia==0.5.11
     - timm==0.9.12
+    - matplotlib==3.3.4
     - -e git+https://github.com/CompVis/taming-transformers.git@master#egg=taming-transformers
     - -e git+https://github.com/openai/CLIP.git@main#egg=clip
     - -e .
