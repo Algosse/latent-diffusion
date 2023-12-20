@@ -4,7 +4,9 @@
 *.pyc
 
 logs/
-logs_saved/
+logs_saved/*/checkpoints
+logs_saved/*/images
+logs_saved/*/wandb
 
 
 data/ILSVRC2012_img_val.tar
