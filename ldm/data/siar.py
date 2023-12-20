@@ -15,7 +15,7 @@ class SIAR(torch.utils.data.Dataset):
     SPLIT_FILE = "split.csv"
     WRONG_FILE = "wrongs.txt"
     
-    def __init__(self, root, set_type='train', transform=None, generate_split=False, resolution=64, max_sequence_size=10):
+    def __init__(self, root, set_type='train', transform=None, generate_split=False, resolution=64, downscale_f=None, max_sequence_size=10):
         """
         Args:   
             path (str): path to the dataset
@@ -45,6 +45,7 @@ class SIAR(torch.utils.data.Dataset):
         self.transform = transform
         
         self.resolution = resolution
+        self.downscale_f = downscale_f
         
         self.max_sequence_size = max_sequence_size
         
@@ -95,6 +96,9 @@ class SIAR(torch.utils.data.Dataset):
             input = [self.transform(im) for im in input]
             
             input = torch.stack(input)
+            
+            if self.downscale_f is not None:
+                raise NotImplementedError("Downscale not implemented yet with transforms")
         else:
             """ to_tensor = transforms.ToTensor()
             gt = to_tensor(gt)
@@ -102,15 +106,25 @@ class SIAR(torch.utils.data.Dataset):
             
             input = torch.stack(input) """
             
+            if self.downscale_f is not None:
+                lr_image = gt.resize((self.resolution // self.downscale_f, self.resolution // self.downscale_f))
+            else:
+                lr_image = gt
+            lr_image = np.array(lr_image).astype(np.uint8)
+            
             gt = np.array(gt).astype(np.uint8)
             input = [np.array(im).astype(np.uint8) for im in input]
             
-            input = np.stack(input)
-        
+            if len(input) == 0:
+                input = gt
+            else:
+                input = np.stack(input)
+
         return {
             'data': (gt/127.5 - 1).astype(np.float32), 
             'label': (input/127.5 - 1).astype(np.float32),
-            'name': self.images[index]
+            'LR_image': (lr_image/127.5 - 1).astype(np.float32),
+            'name': self.images[index]            
         }
         
     def __len__(self):
