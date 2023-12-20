@@ -4,6 +4,7 @@
 *.pyc
 
 logs/
+logs_saved/
 
 
 data/ILSVRC2012_img_val.tar
