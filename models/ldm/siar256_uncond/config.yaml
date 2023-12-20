@@ -1,5 +1,5 @@
 model:
-  base_learning_rate: 0.0001
+  base_learning_rate: 2.0e-06
   target: ldm.models.diffusion.ddpm.LatentDiffusion
   params:
     linear_start: 0.0015
@@ -23,15 +23,15 @@ model:
         out_channels: 3
         model_channels: 96
         attention_resolutions:
+        - 4
         - 2
-        - 2
-        - 2
-        num_res_blocks: 1
+        - 1
+        num_res_blocks: 2
         channel_mult:
         - 1
-        - 1
-        - 1
-        num_heads: 8
+        - 2
+        - 3
+        num_head_channels: 32
     
     first_stage_config:
       target: ldm.models.autoencoder.AutoencoderKL
@@ -64,8 +64,8 @@ model:
 data:
   target: main.DataModuleFromConfig
   params:
-    batch_size: 1
-    num_workers: 10
+    batch_size: 4
+    num_workers: 2
     wrap: false
     train:
       target: ldm.data.siar.SIAR
@@ -88,11 +88,11 @@ lightning:
       target: main.ImageLogger
       params:
         max_images: 4
-        batch_frequency: 500
+        batch_frequency: 250
         log_on_batch_idx: False
         increase_log_steps: False
         log_images_kwargs:
           inpaint: False
           plot_progressive_rows: False
   trainer:
-    accumulate_grad_batches: 8
+    accumulate_grad_batches: 4

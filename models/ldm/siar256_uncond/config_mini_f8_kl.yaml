@@ -1,5 +1,5 @@
 model:
-  base_learning_rate: 2.0e-05
+  base_learning_rate: 2.0e-06
   target: ldm.models.diffusion.ddpm.LatentDiffusion
   params:
     linear_start: 0.0015
@@ -9,17 +9,17 @@ model:
     timesteps: 1000
     first_stage_key: data
     cond_stage_key: label
-    image_size: 64
-    channels: 3
+    image_size: 32
+    channels: 4
     cond_stage_trainable: false
-    concat_mode: false
     monitor: val/loss
+    use_ema: false
     unet_config:
       target: ldm.modules.diffusionmodules.openaimodel.UNetModel
       params:
-        image_size: 64
-        in_channels: 3
-        out_channels: 3
+        image_size: 32
+        in_channels: 4
+        out_channels: 4
         model_channels: 96
         attention_resolutions:
         - 4
@@ -31,9 +31,32 @@ model:
         - 2
         num_head_channels: 32
     first_stage_config:
-      target: ldm.models.autoencoder.IdentityFirstStage
+      target: ldm.models.autoencoder.AutoencoderKL
       params:
-        vq_interface: true
+        monitor: val/rec_loss
+        embed_dim: 4
+        ckpt_path: models/first_stage_models/kl-f8/model.ckpt
+        ddconfig:
+          double_z: true
+          z_channels: 4
+          resolution: 256
+          in_channels: 3
+          out_ch: 3
+          ch: 128
+          ch_mult:
+          - 1
+          - 2
+          - 4
+          - 4
+          num_res_blocks: 2
+          attn_resolutions: []
+          dropout: 0.0
+        lossconfig:
+          target: ldm.modules.losses.LPIPSWithDiscriminator
+          params:
+            disc_start: 50001
+            kl_weight: 1.0e-06
+            disc_weight: 0.5
     cond_stage_config: __is_unconditional__
 data:
   target: main.DataModuleFromConfig
@@ -46,28 +69,26 @@ data:
       params:
         root: ../data/SIARmini
         set_type: train
-        resolution: 64
+        resolution: 256
         max_sequence_size: 1
     validation:
       target: ldm.data.siar.SIAR
       params:
         root: ../data/SIARmini
         set_type: val
-        resolution: 64
+        resolution: 256
         max_sequence_size: 1
-
 lightning:
   callbacks:
     image_logger:
       target: main.ImageLogger
       params:
         max_images: 4
-        batch_frequency: 250
-        log_on_batch_idx: False
-        increase_log_steps: False
+        batch_frequency: 200
+        log_on_batch_idx: false
+        increase_log_steps: false
         log_images_kwargs:
-          inpaint: False
-          plot_progressive_rows: False
- 
-trainer:
-  accumulate_grad_batches: 2
+          inpaint: false
+          plot_progressive_rows: true
+  trainer:
+    accumulate_grad_batches: 2
