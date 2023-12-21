@@ -475,6 +475,10 @@ class SwinTransformer3D(nn.Module):
         patch_norm (bool): If True, add normalization after patch embedding. Default: False.
         frozen_stages (int): Stages to be frozen (stop grad and set eval mode).
             -1 means not freezing any parameters.
+        use_checkpoint (bool): Whether to use checkpointing to save memory. Default: False.
+        sequence_to_image (str): How to convert the sequence of activations to an image. Default: 'mean'
+        output_type (str): Shape of the output. 'image' or 'embed'. Default: 'image'
+        n_embed (int): Number of channels of the output. Default: 3
     """
 
     def __init__(self,
@@ -495,7 +499,10 @@ class SwinTransformer3D(nn.Module):
                  norm_layer=nn.LayerNorm,
                  patch_norm=False,
                  frozen_stages=-1,
-                 use_checkpoint=False):
+                 use_checkpoint=False,
+                 sequence_to_image='mean',
+                 output_type='image',
+                 n_embed=3):
         super().__init__()
 
         self.pretrained = pretrained
@@ -505,11 +512,13 @@ class SwinTransformer3D(nn.Module):
         self.patch_norm = patch_norm
         self.frozen_stages = frozen_stages
         self.window_size = window_size
-        self.patch_size = patch_size
+        self.patch_size = list(patch_size)
+        self.sequence_to_image = sequence_to_image
+        self.output_type = output_type
 
         # split image into non-overlapping patches
         self.patch_embed = PatchEmbed3D(
-            patch_size=patch_size, in_chans=in_chans, embed_dim=embed_dim,
+            patch_size=self.patch_size, in_chans=in_chans, embed_dim=embed_dim,
             norm_layer=norm_layer if self.patch_norm else None)
 
         self.pos_drop = nn.Dropout(p=drop_rate)
@@ -542,6 +551,14 @@ class SwinTransformer3D(nn.Module):
         self.norm = norm_layer(self.num_features)
 
         self._freeze_stages()
+        
+        # Define output layer
+        if self.output_type == 'image':
+            self.output_layer = nn.Conv2d(self.num_features, n_embed, kernel_size=1)
+        elif self.output_type == 'embed':
+            raise NotImplementedError(f"Embed output not implemented yet")
+        else:
+            raise NotImplementedError(f"Unknown output_type: {self.output_type}")
 
     def _freeze_stages(self):
         if self.frozen_stages >= 0:
@@ -623,7 +640,43 @@ class SwinTransformer3D(nn.Module):
         x = self.norm(x)
         x = rearrange(x, 'n d h w c -> n c d h w')
 
+        x = self.get_output_from_sequence(x)
+
         return x
+    
+    def get_output_from_sequence(self, act):
+        """ 
+            Convert the output of the transformer into some input for the U-Net
+            act: B, C, S, H, W
+            
+            Unet expects either:
+                - An Image: B, n_embed, H, W
+                - An embeded vector: B, n_embed
+                
+            First, we convert the sequence into an image with C channels with either 'sequence_to_image':
+                - mean
+                - attention
+                - class_token
+            
+            Then, we convert the image:
+                - Image with n_embed channels: B, n_embed, H, W
+                - Embeded vector with n_embed features: B, n_embed
+        """
+        
+        if self.sequence_to_image == 'mean':
+            out = act.mean(dim=2)
+        elif self.sequence_to_image == 'attention':
+            # compute an attention mask and apply it to the sequence to create a weighted sum of the inputs
+            att_mask = torch.softmax(act, dim=2)
+            out = (act * att_mask).sum(dim=2)
+        elif self.sequence_to_image == 'class_token':
+            raise NotImplementedError(f"Class token not implemented yet")
+        else:
+            raise ValueError(f"Unknown sequence_to_image value: {self.sequence_to_image}")
+        
+        out = self.output_layer(out)
+        
+        return out
 
     def train(self, mode=True):
         """Convert the model into training mode while keep layers freezed."""
@@ -636,8 +689,8 @@ if __name__ == '__main__':
         patch_size=(2,4,4),
         in_chans=3,
         embed_dim=96,
-        depths=[12],
-        num_heads=[6],
+        depths=[2],
+        num_heads=[2],
         window_size=(2,7,7),
         mlp_ratio=4.,
         qkv_bias=True,
@@ -648,13 +701,16 @@ if __name__ == '__main__':
         norm_layer=nn.LayerNorm,
         patch_norm=False,
         frozen_stages=-1,
-        use_checkpoint=False)
+        use_checkpoint=False,
+        sequence_to_image='attention',
+        output_type='image',
+        n_embed=3)
     
-    x = torch.randn(1, 3, 32, 64, 64)
+    x = torch.randn(8, 3, 10, 256, 256)
 
     out = transformer(x)
 
-    print(out.shape)
+    print(out.shape) 
 
     # print transformer parameters
 

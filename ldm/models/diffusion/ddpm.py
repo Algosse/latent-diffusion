@@ -328,9 +328,12 @@ class DDPM(pl.LightningModule):
 
     def get_input(self, batch, k):
         x = batch[k]
-        if len(x.shape) == 3:
-            x = x[..., None]
-        x = rearrange(x, 'b h w c -> b c h w')
+        if len(x.shape) == 5:
+            x = rearrange(x, 'b s h w c -> b c s h w') # for video or image sequence
+        else:
+            if len(x.shape) == 3:
+                x = x[..., None]
+            x = rearrange(x, 'b h w c -> b c h w')
         x = x.to(memory_format=torch.contiguous_format).float()
         return x
 
