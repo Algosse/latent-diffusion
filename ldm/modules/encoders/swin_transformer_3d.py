@@ -706,7 +706,7 @@ if __name__ == '__main__':
         output_type='image',
         n_embed=3)
     
-    x = torch.randn(8, 3, 10, 256, 256)
+    x = torch.randn(8, 3, 2, 256, 256)
 
     out = transformer(x)
 

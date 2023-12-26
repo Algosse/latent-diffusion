@@ -15,13 +15,18 @@ class SIAR(torch.utils.data.Dataset):
     SPLIT_FILE = "split.csv"
     WRONG_FILE = "wrongs.txt"
     
-    def __init__(self, root, set_type='train', transform=None, generate_split=False, resolution=64, downscale_f=None, max_sequence_size=10):
+    def __init__(self, root, set_type='train', transform=None, generate_split=False, resolution=64, downscale_f=None, max_sequence_size=10, random_label=False):
         """
         Args:   
             path (str): path to the dataset
             set (str): train, val or test
             transform (torchvision.transforms): transform to apply to the images
             generate_split (bool): if True, generate a new split file
+            resolution (int): resolution to resize the images to
+            downscale_f (int): if not None, downscale the ground truth to create a Lower Resolution image (LR_image)
+            max_sequence_size (int): maximum number of label images in a sequence
+            random_label (bool): if False, returns the first max_sequence_size images as label, 
+                                 if True, returns a random sequence of [1, max_sequence_size] images as label
         """
         
         assert set_type in ['train', 'val', 'test'], "set_type must be train, val or test"
@@ -48,6 +53,7 @@ class SIAR(torch.utils.data.Dataset):
         self.downscale_f = downscale_f
         
         self.max_sequence_size = max_sequence_size
+        self.random_label = random_label
         
     def __getitem__(self, index):
         """
@@ -68,10 +74,8 @@ class SIAR(torch.utils.data.Dataset):
             index (int): index of item
         Returns:
             dict: {'gt': gt, 'input': inputs}
-                gt: torch.tensor
-                input: torch.tensor
-                    Shape is determined by the transform applied. Without transform, shapes are gt:
-                    (256, 256, 3), input: (10, 256, 256, 3)
+                gt: np.array of shape (resolution, resolution, 3), ground truth image
+                label: np.array of shape (max_sequence_size, resolution, resolution, 3), input images
         """
 
         if index >= self.len:
@@ -84,11 +88,7 @@ class SIAR(torch.utils.data.Dataset):
         gt = gt.resize((self.resolution, self.resolution))
         
         # read input images
-        input = []
-        for i in range(1, self.max_sequence_size + 1):
-            im = Image.open(os.path.join(self.root, self.images[index], str(i) + ".png"))
-            im = im.resize((self.resolution, self.resolution))
-            input.append(im)
+        input = self.__get_label_images(index)
         
         # apply transform if any
         if self.transform:
@@ -126,6 +126,26 @@ class SIAR(torch.utils.data.Dataset):
             'LR_image': (lr_image/127.5 - 1).astype(np.float32),
             'name': self.images[index]            
         }
+        
+    def __get_label_images(self, index):
+        """ Read the label images from the disk 
+            if self.random_label is True, returns a random sequence of [1, max_sequence_size] images as label
+            else, returns the first max_sequence_size images as label   
+        """
+        label = []
+        
+        if self.random_label:
+            label_size = random.randint(1, self.max_sequence_size)
+            indexes = random.sample(range(1, self.max_sequence_size + 1), label_size)
+        else:
+            indexes = range(1, self.max_sequence_size + 1)
+        
+        for i in indexes:
+            im = Image.open(os.path.join(self.root, self.images[index], str(i) + ".png"))
+            im = im.resize((self.resolution, self.resolution))
+            label.append(im)
+        
+        return label
         
     def __len__(self):
         """ Get the length of the dataset """
@@ -207,13 +227,15 @@ if __name__ == "__main__":
     transform = transforms.Compose(
         [transforms.ToTensor()])
 
-    data = SIAR("data/SIARmini", set_type='train', transform=transform)
+    data = SIAR("data/SIARmini", set_type='train', max_sequence_size=10, random_label=False)
     
-    dataloader = torch.utils.data.DataLoader(data, batch_size=4)
+    """ dataloader = torch.utils.data.DataLoader(data, batch_size=4)
     
     im = next(iter(dataloader))
 
     print(data[0]['data'].size())
     
-    print(len(data))
+    print(len(data)) """
     
+    
+    print(data[0]['label'].shape)
