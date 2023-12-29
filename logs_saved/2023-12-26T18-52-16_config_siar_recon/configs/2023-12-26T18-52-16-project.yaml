@@ -56,17 +56,17 @@ model:
     cond_stage_config:
       target: ldm.modules.encoders.swin_transformer_3d.SwinTransformer3D
       params:
-        patch_size: 
-        - 2 # Sequence axis
-        - 4 # Height axis
-        - 4 # Width axis
+        patch_size:
+        - 2
+        - 4
+        - 4
         in_chans: 3
         embed_dim: 96
         depths:
         - 8
-        num_heads: 
+        num_heads:
         - 3
-        window_size: 
+        window_size:
         - 2
         - 7
         - 7
@@ -74,7 +74,6 @@ model:
         sequence_to_image: attention
         output_type: image
         n_embed: 3
-
 data:
   target: main.DataModuleFromConfig
   params:
@@ -99,17 +98,3 @@ data:
         downscale_f: 4
         max_sequence_size: 10
         random_label: true
-lightning:
-  callbacks:
-    image_logger:
-      target: main.ImageLogger
-      params:
-        max_images: 4
-        batch_frequency: 400
-        log_on_batch_idx: false
-        increase_log_steps: false
-        log_images_kwargs:
-          inpaint: false
-          plot_progressive_rows: false
-  trainer:
-    accumulate_grad_batches: 2

@@ -92,6 +92,7 @@ class SIAR(torch.utils.data.Dataset):
         
         # apply transform if any
         if self.transform:
+            # CHANGES MADE THIS PART NOT
             gt = self.transform(gt)
             input = [self.transform(im) for im in input]
             
@@ -113,12 +114,13 @@ class SIAR(torch.utils.data.Dataset):
             lr_image = np.array(lr_image).astype(np.uint8)
             
             gt = np.array(gt).astype(np.uint8)
-            input = [np.array(im).astype(np.uint8) for im in input]
-            
+                        
             if len(input) == 0:
                 input = gt
             else:
                 input = np.stack(input)
+                
+                input = np.pad(input, ((0, self.max_sequence_size - input.shape[0]), (0, 0), (0, 0), (0, 0)), 'constant', constant_values=0)
 
         return {
             'data': (gt/127.5 - 1).astype(np.float32), 
@@ -143,7 +145,7 @@ class SIAR(torch.utils.data.Dataset):
         for i in indexes:
             im = Image.open(os.path.join(self.root, self.images[index], str(i) + ".png"))
             im = im.resize((self.resolution, self.resolution))
-            label.append(im)
+            label.append(np.array(im).astype(np.uint8))
         
         return label
         
@@ -227,7 +229,7 @@ if __name__ == "__main__":
     transform = transforms.Compose(
         [transforms.ToTensor()])
 
-    data = SIAR("data/SIARmini", set_type='train', max_sequence_size=10, random_label=False)
+    data = SIAR("data/SIARmini", set_type='train', max_sequence_size=10, random_label=True)
     
     """ dataloader = torch.utils.data.DataLoader(data, batch_size=4)
     
