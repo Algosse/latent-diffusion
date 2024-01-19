@@ -1,0 +1,16 @@
+lightning:
+  callbacks:
+    image_logger:
+      target: main.ImageLogger
+      params:
+        max_images: 4
+        batch_frequency: 400
+        log_on_batch_idx: false
+        increase_log_steps: false
+        log_images_kwargs:
+          inpaint: false
+          plot_progressive_rows: false
+  trainer:
+    accumulate_grad_batches: 2
+    accelerator: dp
+    gpus: 0,
