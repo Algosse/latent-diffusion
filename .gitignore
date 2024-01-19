@@ -6,6 +6,7 @@
 logs/
 logs_saved/*/checkpoints
 logs_saved/*/images
+logs_saved/*/*/*.png
 logs_saved/*/wandb
 
 
