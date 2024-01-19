@@ -130,7 +130,7 @@ class Benchmark():
                     for i in range(prediction.shape[0]):
                         for name, metric in self.metrics.items():
                             if metric is not None:
-                                im_2, pred = (im[i].unsqueeze(0) + 1) / 2, (prediction[i].unsqueeze(0) + 1) / 2
+                                im_2, pred = (im[i].unsqueeze(0) + 1)/2, prediction[i].unsqueeze(0) # both between -1 and 1
                                 score = metric(pred, im_2)
                                 
                                 if name == 'lpips':
@@ -252,7 +252,7 @@ if __name__ == '__main__':
 
     from ldm.data.siar import SIAR
 
-    dataset = SIAR(root=os.path.join(ROOT_PATH, 'data', dataset), set_type='val', resolution=256)
+    dataset = SIAR(root=os.path.join(ROOT_PATH, 'data', dataset), set_type='val', resolution=64)
     print(f"Dataset size: {len(dataset)}")
     dataloader = torch.utils.data.DataLoader(dataset, batch_size=12)
 

@@ -3,7 +3,7 @@
 
 # # Sequence restoration with Latent Diffusion Models
 
-# In[1]:
+# In[36]:
 
 
 import matplotlib.pyplot as plt
@@ -18,12 +18,13 @@ from einops import rearrange
 from torchvision.utils import make_grid
 from torchvision.transforms.functional import resize
 
+import torch
+device = 'cuda' if torch.cuda.is_available() else 'cpu'
+
 
 # Let's also check what type of GPU we've got.
 
-# In[2]:
-
-# In[3]:
+# In[37]:
 
 
 import os
@@ -32,7 +33,7 @@ os.chdir("/home/alban/ImSeqCond/latent-diffusion/")
 
 # Load it.
 
-# In[4]:
+# In[38]:
 
 
 #@title loading utils
@@ -60,26 +61,26 @@ def load_model_from_config(config, ckpt=None):
 #cond_key = 'label'
 cond_key = 'LR_image'
 
+model_folder = "/home/alban/ImSeqCond/latent-diffusion/logs_saved/2023-12-21T00-11-09_config_siar_sr"
+checkpoint = "epoch=000036.ckpt"
+
+files = os.listdir(os.path.join(model_folder, "configs"))
+config_file = ""
+for file in files:
+    if file.endswith("project.yaml"):
+        config_file = file
+        break
+
+if config_file == "":
+    raise ValueError("No config file found")
+
 def get_model():
-    model_folder = "/home/alban/ImSeqCond/latent-diffusion/logs_saved/2023-12-21T00-11-09_config_siar_sr"
-    checkpoint = "epoch=000036.ckpt"
-    
-    files = os.listdir(os.path.join(model_folder, "configs"))
-    config_file = ""
-    for file in files:
-        if file.endswith("project.yaml"):
-            config_file = file
-            break
-    
-    if config_file == "":
-        raise ValueError("No config file found")
-    
     config = OmegaConf.load(os.path.join(model_folder, 'configs', config_file))
     model = load_model_from_config(config, os.path.join(model_folder, "checkpoints", checkpoint))
     return model
 
 
-# In[5]:
+# In[39]:
 
 
 from ldm.models.diffusion.ddim import DDIMSampler
@@ -92,19 +93,19 @@ params = sum([p.numel() for p in model.parameters() if p.requires_grad])
 print(f"Model has {params/1e6:.2f}M parameters")
 
 
-# In[6]:
+# In[40]:
 
 
 # Load some custom data
 from ldm.data.siar import SIAR
 
-dataset = SIAR("/home/alban/ImSeqCond/data/SIAR", set_type='val', resolution=256, max_sequence_size=1, downscale_f=4)
+dataset = SIAR("/home/alban/ImSeqCond/data/SIAR", set_type='val', resolution=256, max_sequence_size=10, downscale_f=4)
 dataloader = torch.utils.data.DataLoader(dataset, batch_size=4, shuffle=False)
 
 
 # And go. Quality, sampling speed and diversity are best controlled via the `scale`, `ddim_steps` and `ddim_eta` variables. As a rule of thumb, higher values of `scale` produce better samples at the cost of a reduced output diversity. Furthermore, increasing `ddim_steps` generally also gives higher quality samples, but returns are diminishing for values > 250. Fast sampling (i e. low values of `ddim_steps`) while retaining good quality can be achieved by using `ddim_eta = 0.0`.
 
-# In[7]:
+# In[41]:
 
 
 i = 5
@@ -167,7 +168,7 @@ grid = 255. * rearrange(grid, 'c h w -> h w c').cpu().numpy()
 Image.fromarray(grid.astype(np.uint8))
 
 
-# In[8]:
+# In[42]:
 
 
 def plot_image(data, predict=None):
@@ -197,7 +198,7 @@ def plot_image(data, predict=None):
     plt.show()
 
 
-# In[9]:
+# In[43]:
 
 
 def prepare_for_plot(data, all_samples=None):
@@ -214,13 +215,13 @@ def prepare_for_plot(data, all_samples=None):
     return data_prepared, predict_prepared
 
 
-# In[10]:
+# In[44]:
 
 
 plot_image(*prepare_for_plot(dataset[i], all_samples))
 
 
-# In[11]:
+# In[45]:
 
 
 # STUDY OF THE LATENT SPACE
@@ -249,7 +250,7 @@ axes[1].imshow(cond_decode)
 axes[1].set_title("Cond in pixel space") """
 
 
-# In[15]:
+# In[46]:
 
 
 from benchmark import Benchmark
@@ -259,17 +260,13 @@ class BenchmarkLDM(Benchmark):
     def __init__(self, model, dataloader, mse=True, clip=False, lpips=False, cond_key='label'):
         super().__init__(model, dataloader, mse, clip, lpips, cond_key)
     
-    def sample(self, data):
+    def sample(self, data, ddim_steps=20, ddim_eta=0.0, scale=1):
         """ Method used to sample from the model with the data as conditionning 
             Args:
                 data (torch.tensor): conditionning data. size: (batch_size, 3, W, H) or (batch_size, 10, 3, W, H)
             Output:
                 torch.tensor: restored image. size: (batch_size, 3, W, H)
         """
-        
-        ddim_steps = 200
-        ddim_eta = 0.0
-        scale = 1   # for unconditional guidance
         
         if self.cond_key == 'LR_image':
             xc = rearrange(torch.tensor(data), 'b h w c -> b c h w')
@@ -295,14 +292,70 @@ class BenchmarkLDM(Benchmark):
         return x_samples_ddim
 
 
-# In[16]:
+# In[47]:
 
 
 benchmark = BenchmarkLDM(model, dataloader, mse=True, clip=True, lpips=True, cond_key=cond_key)
 
 
-# In[17]:
+# In[48]:
 
 
 results = benchmark.evaluate()
+
+
+# In[49]:
+
+
+def rescale(data):
+    """ Rescale data between 0 and 1 from -1 and 1
+        Args:
+            data (torch.tensor): data to rescale
+        Output:
+            torch.tensor: rescaled data
+    """
+    return {
+        'data': (data['data'] + 1) / 2,
+        'label': (data['label'] + 1) / 2,
+        'name': data['name'],
+    }
+
+
+# In[ ]:
+
+
+# GENERATE SAMPLES
+
+from PIL import Image
+import numpy as np
+
+output_folder = os.path.join(model_folder, 'test_predictions')
+
+print(output_folder)
+
+for i in range(min(1, len(dataset))):
+    
+    j = np.random.randint(len(dataset))
+    data = dataset[i]
+    
+    y = data[cond_key]
+
+    predict = benchmark.sample(y[None,...],20)
+    #predict = model.predict(y.unsqueeze(0).to(device))
+    out = predict.detach().cpu()
+    
+    out = out[0].transpose(0,1).transpose(1,2)
+    
+    if os.path.exists(output_folder) == False:
+        os.makedirs(output_folder)
+        
+    # rescale data
+    data = rescale(data) # scale between 0 and 1
+    
+    plot_image(data, out)
+    
+    out_im = (out.numpy()* 255).astype(np.uint8) # rescale to 0-255
+    
+    im_pil = Image.fromarray(out_im)
+    im_pil.save(os.path.join(output_folder, f'{data["name"]}.png'))
 
