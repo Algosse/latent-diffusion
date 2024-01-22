@@ -1,6 +1,8 @@
 import os
 from tqdm import tqdm
 
+from einops import rearrange
+
 import torch
 import torch.nn as nn
 from torchvision.transforms import transforms
@@ -16,7 +18,8 @@ except ImportError:
 device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
 print(device)
 
-ROOT_PATH = "/home/alban/ImSeqCond"
+#ROOT_PATH = "/home/alban/ImSeqCond"
+ROOT_PATH = "C:/Users/Shadow/Documents/ImSeqCond/"
 
 dataset = 'SIAR'
 
@@ -162,6 +165,75 @@ class Benchmark():
         
         return self.results
     
+    def evaluate_with_repeat(self, n_rep=4):
+
+        metrics_used = [key for key, metric in self.metrics.items() if metric is not None]
+        print(f"Evaluating model on metrics {', '.join(metrics_used)}")
+        
+        self.model.eval()
+        self.model.to(device)
+        
+        scores = {key: [] for key in self.metrics.keys()}
+        
+        min_scores = {key: float('inf') for key in self.metrics.keys()}
+        min_scores_im = {key: None for key in self.metrics.keys()}
+        max_scores = {key: float('-inf') for key in self.metrics.keys()}
+        max_scores_im = {key: None for key in self.metrics.keys()}
+        
+        for data in tqdm(self.dataloader):
+                
+                im = torch.tensor(data['data']).permute(0, 3, 1, 2).to(device)
+                label = data[self.cond_key]
+                
+                with torch.no_grad():
+                
+                    prediction = self.sample_repeat(label, n_rep=n_rep) # (B, n_rep, C, H, W)
+
+                    print("Prediction",prediction.shape)
+
+                    for i in range(prediction.shape[0]):
+                        for name, metric in self.metrics.items():
+                            if metric is not None:
+                                im_2 = (im[i].unsqueeze(0) + 1)/2  # both between -1 and 1 (1, C, H, W)
+                                im_2 = im_2.repeat(n_rep, 1, 1, 1) # (n_rep, C, H, W)
+
+                                pred = prediction[i] # (n_rep, C, H, W)
+
+                                scores_repeat = metric(pred, im_2)
+                                score = scores_repeat.min().unsqueeze(0)
+                                """ if name == 'lpips':
+                                    scores[name].append(score.unsqueeze(0))
+                                else: """
+                                scores[name].append(score)
+                                
+                                if score.min() < min_scores[name]:
+                                    min_scores[name] = score.min()
+                                    min_scores_im[name] = data['name'][score.argmin().item()]
+                                
+                                if score.max() > max_scores[name]:
+                                    max_scores[name] = score.max()
+                                    max_scores_im[name] = data['name'][score.argmax().item()]
+
+        for name, metric in self.metrics.items():
+            if metric is not None:
+                metric_scores = torch.cat(scores[name])
+                print(f"Metric {name} score: {metric_scores.mean().item()}, lowest score: {metric_scores.min().item()} for image {min_scores_im[name]}, highest score: {metric_scores.max().item()} for image {max_scores_im[name]}")
+                self.results[name] = {
+                    'mean': metric_scores.mean().item(),
+                    'min': metric_scores.min().item(),
+                    'max': metric_scores.max().item(),
+                    'min_im': min_scores_im[name],
+                    'max_im': max_scores_im[name],
+                }
+        
+        print("Find results in 'results' attribute")
+        
+        return self.results
+
+    def sample_repeat(self, data, n_rep=4):
+        """ Overwrite this method to sample from the model with data as conditioning """
+        pass
+
     def sample(self, data):
         """ Overwrite this method to sample from the model with data as conditioning """
         pass
@@ -249,13 +321,22 @@ if __name__ == '__main__':
                 data = data.to(device)
                 
                 return self.model(data)
+        
+            def sample_repeat(self, data, n_rep=4):
+                
+                samples = []
+
+                for i in range(n_rep):
+                    samples.append(self.sample(data))
+                
+                return rearrange(torch.stack(samples), 'n b c h w -> b n c h w')
 
     from ldm.data.siar import SIAR
 
-    dataset = SIAR(root=os.path.join(ROOT_PATH, 'data', dataset), set_type='val', resolution=64)
+    dataset = SIAR(root=os.path.join(ROOT_PATH, 'data', dataset), set_type='val', resolution=64)[:50]
     print(f"Dataset size: {len(dataset)}")
     dataloader = torch.utils.data.DataLoader(dataset, batch_size=12)
 
     benchmark = BaselineBenchmark(Baseline(), dataloader, mse=True, clip=True, lpips=True, cond_key='label')
         
-    benchmark.evaluate()
+    benchmark.evaluate_with_repeat()
