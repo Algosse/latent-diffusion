@@ -3,7 +3,7 @@
 
 # # Sequence restoration with Latent Diffusion Models
 
-# In[36]:
+# In[ ]:
 
 
 import matplotlib.pyplot as plt
@@ -24,7 +24,7 @@ device = 'cuda' if torch.cuda.is_available() else 'cpu'
 
 # Let's also check what type of GPU we've got.
 
-# In[37]:
+# In[ ]:
 
 
 import os
@@ -33,7 +33,7 @@ os.chdir("/home/alban/ImSeqCond/latent-diffusion/")
 
 # Load it.
 
-# In[38]:
+# In[ ]:
 
 
 #@title loading utils
@@ -58,11 +58,11 @@ def load_model_from_config(config, ckpt=None):
     model.eval()
     return model
 
-#cond_key = 'label'
-cond_key = 'LR_image'
+cond_key = 'label'
+#cond_key = 'LR_image'
 
-model_folder = "/home/alban/ImSeqCond/latent-diffusion/logs_saved/2023-12-21T00-11-09_config_siar_sr"
-checkpoint = "epoch=000036.ckpt"
+model_folder = "/home/alban/ImSeqCond/latent-diffusion/logs_saved/2023-12-21T15-15-42_config_siar_recon"
+checkpoint = "epoch=000058.ckpt"
 
 files = os.listdir(os.path.join(model_folder, "configs"))
 config_file = ""
@@ -80,7 +80,7 @@ def get_model():
     return model
 
 
-# In[39]:
+# In[ ]:
 
 
 from ldm.models.diffusion.ddim import DDIMSampler
@@ -93,29 +93,40 @@ params = sum([p.numel() for p in model.parameters() if p.requires_grad])
 print(f"Model has {params/1e6:.2f}M parameters")
 
 
-# In[40]:
+# In[ ]:
 
 
 # Load some custom data
 from ldm.data.siar import SIAR
 
-dataset = SIAR("/home/alban/ImSeqCond/data/SIAR", set_type='val', resolution=256, max_sequence_size=10, downscale_f=4)
+dataset = SIAR("/home/alban/ImSeqCond/data/SIAR", set_type='val', resolution=256, max_sequence_size=4, downscale_f=4)
 dataloader = torch.utils.data.DataLoader(dataset, batch_size=4, shuffle=False)
+
+
+# In[ ]:
+
+
+# Find the index of an image in the dataset
+
+""" for i in range(len(dataset)):
+    if dataset[i]['name'] == "7139":
+        print(i)
+        break """
 
 
 # And go. Quality, sampling speed and diversity are best controlled via the `scale`, `ddim_steps` and `ddim_eta` variables. As a rule of thumb, higher values of `scale` produce better samples at the cost of a reduced output diversity. Furthermore, increasing `ddim_steps` generally also gives higher quality samples, but returns are diminishing for values > 250. Fast sampling (i e. low values of `ddim_steps`) while retaining good quality can be achieved by using `ddim_eta = 0.0`.
 
-# In[41]:
+# In[ ]:
 
 
-i = 5
+i = 1165
 
 images_indexes = [i]
 n_samples_per_image = 6
 
 ddim_steps = 20
 ddim_eta = 0.0
-scale = 3  # for unconditional guidance
+scale = 1  # for unconditional guidance
 
 
 all_samples = list()
@@ -132,7 +143,7 @@ with torch.no_grad():
             ) """
 
         for image_index in images_indexes:
-            print(f"rendering {n_samples_per_image} examples of images '{image_index}' in {ddim_steps} steps and using s={scale:.2f}.")
+            print(f"rendering {n_samples_per_image} examples of images '{dataset[image_index]['name']}' in {ddim_steps} steps and using s={scale:.2f}.")
             
             if cond_key == 'LR_image':
                 xc = rearrange(torch.tensor(dataset[image_index]['LR_image']), 'h w c -> c h w').unsqueeze(0).repeat(n_samples_per_image, 1, 1, 1)
@@ -168,7 +179,7 @@ grid = 255. * rearrange(grid, 'c h w -> h w c').cpu().numpy()
 Image.fromarray(grid.astype(np.uint8))
 
 
-# In[42]:
+# In[ ]:
 
 
 def plot_image(data, predict=None):
@@ -198,7 +209,7 @@ def plot_image(data, predict=None):
     plt.show()
 
 
-# In[43]:
+# In[ ]:
 
 
 def prepare_for_plot(data, all_samples=None):
@@ -215,13 +226,13 @@ def prepare_for_plot(data, all_samples=None):
     return data_prepared, predict_prepared
 
 
-# In[44]:
+# In[ ]:
 
 
 plot_image(*prepare_for_plot(dataset[i], all_samples))
 
 
-# In[45]:
+# In[ ]:
 
 
 # STUDY OF THE LATENT SPACE
@@ -250,7 +261,7 @@ axes[1].imshow(cond_decode)
 axes[1].set_title("Cond in pixel space") """
 
 
-# In[46]:
+# In[ ]:
 
 
 from benchmark import Benchmark
@@ -292,19 +303,19 @@ class BenchmarkLDM(Benchmark):
         return x_samples_ddim
 
 
-# In[47]:
+# In[ ]:
 
 
 benchmark = BenchmarkLDM(model, dataloader, mse=True, clip=True, lpips=True, cond_key=cond_key)
 
 
-# In[48]:
+# In[ ]:
 
 
 results = benchmark.evaluate()
 
 
-# In[49]:
+# In[ ]:
 
 
 def rescale(data):
@@ -333,7 +344,7 @@ output_folder = os.path.join(model_folder, 'test_predictions')
 
 print(output_folder)
 
-for i in range(min(1, len(dataset))):
+for i in range(min(10, len(dataset))):
     
     j = np.random.randint(len(dataset))
     data = dataset[i]
