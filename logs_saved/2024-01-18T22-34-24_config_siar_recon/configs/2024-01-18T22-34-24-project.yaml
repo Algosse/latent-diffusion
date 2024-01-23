@@ -56,26 +56,24 @@ model:
     cond_stage_config:
       target: ldm.modules.encoders.swin_transformer_3d.SwinTransformer3D
       params:
-        res: 256
-        patch_size: 
-        - 2 # Sequence axis
-        - 4 # Height axis
-        - 4 # Width axis
+        patch_size:
+        - 2
+        - 4
+        - 4
         in_chans: 3
         embed_dim: 96
         depths:
         - 8
-        num_heads: 
+        num_heads:
         - 3
-        window_size: 
+        window_size:
         - 2
         - 7
         - 7
         use_checkpoint: true
-        sequence_to_image: class_token
+        sequence_to_image: attention
         output_type: image
         n_embed: 3
-
 data:
   target: main.DataModuleFromConfig
   params:
@@ -88,6 +86,7 @@ data:
         root: ../data/SIAR
         set_type: train
         resolution: 256
+        downscale_f: 4
         max_sequence_size: 10
     validation:
       target: ldm.data.siar.SIAR
@@ -95,18 +94,5 @@ data:
         root: ../data/SIAR
         set_type: val
         resolution: 256
+        downscale_f: 4
         max_sequence_size: 10
-lightning:
-  callbacks:
-    image_logger:
-      target: main.ImageLogger
-      params:
-        max_images: 4
-        batch_frequency: 800
-        log_on_batch_idx: false
-        increase_log_steps: false
-        log_images_kwargs:
-          inpaint: false
-          plot_progressive_rows: false
-  trainer:
-    accumulate_grad_batches: 2
