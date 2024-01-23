@@ -484,6 +484,7 @@ class SwinTransformer3D(nn.Module):
     def __init__(self,
                  pretrained=None,
                  pretrained2d=True,
+                 res=256,
                  patch_size=(4,4,4),
                  in_chans=3,
                  embed_dim=96,
@@ -559,6 +560,10 @@ class SwinTransformer3D(nn.Module):
             raise NotImplementedError(f"Embed output not implemented yet")
         else:
             raise NotImplementedError(f"Unknown output_type: {self.output_type}")
+        
+        if self.sequence_to_image == "class_token":
+            self.class_token = nn.Parameter(torch.rand(embed_dim, 1, res//4, res//4))
+            trunc_normal_(self.class_token, std=.02)
 
     def _freeze_stages(self):
         if self.frozen_stages >= 0:
@@ -632,6 +637,9 @@ class SwinTransformer3D(nn.Module):
         x = self.patch_embed(x)
 
         x = self.pos_drop(x)
+        
+        if self.sequence_to_image == 'class_token':
+            x = torch.cat([self.class_token.repeat(x.shape[0], 1, 1, 1, 1), x], dim=2)
 
         for layer in self.layers:
             x = layer(x.contiguous())
@@ -670,7 +678,7 @@ class SwinTransformer3D(nn.Module):
             att_mask = torch.softmax(act, dim=2)
             out = (act * att_mask).sum(dim=2)
         elif self.sequence_to_image == 'class_token':
-            raise NotImplementedError(f"Class token not implemented yet")
+            out = act[:, :, 0, :, :]
         else:
             raise ValueError(f"Unknown sequence_to_image value: {self.sequence_to_image}")
         
@@ -688,6 +696,7 @@ if __name__ == '__main__':
     transformer = SwinTransformer3D(
         patch_size=(2,4,4),
         in_chans=3,
+        res=256,
         embed_dim=96,
         depths=[2],
         num_heads=[2],
@@ -702,11 +711,11 @@ if __name__ == '__main__':
         patch_norm=False,
         frozen_stages=-1,
         use_checkpoint=False,
-        sequence_to_image='attention',
+        sequence_to_image='class_token',
         output_type='image',
         n_embed=3)
     
-    x = torch.randn(8, 3, 2, 256, 256)
+    x = torch.randn(8, 3, 10, 256, 256)
 
     out = transformer(x)
 
